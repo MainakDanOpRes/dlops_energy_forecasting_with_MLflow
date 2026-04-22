@@ -1,1 +1,13 @@
-key: val
+target_column: 
+  name: Global_active_power
+
+columns:
+  Date: object
+  Time: object
+  Global_active_power: float64
+  Global_reactive_power: float64
+  Voltage: float64
+  Global_intensity: float64
+  Sub_metering_1: float64
+  Sub_metering_2: float64
+  Sub_metering_3: float64
