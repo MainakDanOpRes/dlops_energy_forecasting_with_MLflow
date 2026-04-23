@@ -22,15 +22,15 @@ class DataValidation:
             if not os.path.exists(self.config.unzip_data_dir):
                 validation_status = False
                 with open(self.config.STATUS_FILE, 'w') as f:
-                    f.write(f"validation status: {validation_status} (Input file missing)")
+                    f.write(f"validation status: {validation_status}")
                 return validation_status
 
             data = pd.read_csv(self.config.unzip_data_dir, sep=';', na_values=['?'], low_memory=False)
             
-            schema_dict = self.config.all_schema.get('columns', {})
+            schema_dict = self.config.all_schema
 
             for col in data.columns:
-                if col not in schema_dict:
+                if col not in schema_dict.keys():
                     validation_status = False
                     break
                 

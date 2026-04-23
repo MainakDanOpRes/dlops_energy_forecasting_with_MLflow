@@ -11,4 +11,13 @@ data_validation:
   root_dir: artifacts/data_validation
   STATUS_FILE: artifacts/data_validation/status.txt
   unzip_data_dir: artifacts/data_ingestion/household_power_consumption.txt
+
+data_transformation:
+  root_dir: artifacts/data_transformation
+  data_path: artifacts/data_ingestion/household_power_consumption.txt
+  transformed_train_file_path: artifacts/data_transformation/train_transformed.csv
+  transformed_test_file_path: artifacts/data_transformation/test_transformed.csv
+  preprocessor_obj_file_path: artifacts/data_transformation/preprocessor.pkl
+  date_col: Date
+  time_col: Time
   
