@@ -1,1 +1,26 @@
-key: val
+# Data Transformation Parameters
+data_transformation:
+  window_size: 24
+
+# Deep Learning Model Parameters
+LSTM:
+  units_layer_1: 64
+  units_layer_2: 32
+  dropout_rate: 0.2
+  dense_units: 16
+  learning_rate: 0.001
+  epochs: 20
+  batch_size: 32
+  optimizer: "adam"
+  loss: "mse"
+
+GRU:
+  units_layer_1: 64
+  units_layer_2: 32
+  dropout_rate: 0.2
+  dense_units: 16
+  learning_rate: 0.001
+  epochs: 20
+  batch_size: 32
+  optimizer: "adam"
+  loss: "mse"
