@@ -4,12 +4,36 @@ import pandas as pd
 from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.model_selection import train_test_split 
+from sklearn.preprocessing import MinMaxScaler
 
 from src.dlProject_energy_demand_forcasting.utils.exception import CustomException
 from src.dlProject_energy_demand_forcasting.utils.logger import logging
 from src.dlProject_energy_demand_forcasting.utils.utils import save_object
 
 from src.dlProject_energy_demand_forcasting.entity.config_entity import DataTransformationConfig
+
+class TimeSeriesScaling(BaseEstimator, TransformerMixin):
+    """
+    Scales features using MinMaxScaler while preserving 
+    the
+    """
+
+    def __init__(self):
+        self.scaler = MinMaxScaler(feature_range=(0,1))
+        self.columns = None
+        self.index = None
+
+    def fit(self, X, y=None):
+        self.scaler.fit(X)
+        self.columns = X.columns
+        self.is_fitted_ = True
+        return self
+    
+    def transform(self, X):
+        X_scaled = self.scaler.transform(X)
+        # Convert back to DataFrame to keep Datetime Index and Column Names
+        return pd.DataFrame(X_scaled, columns=self.columns, index=X.index)
+
 
 
 class DatetimeIndexer(BaseEstimator, TransformerMixin):
@@ -100,6 +124,7 @@ class DataTransformation:
                 )),
                 ("imputer", TimeSeriesImputer(method='time')),
                 ("resampler", TimeSeriesResampler(frequency='h')),
+                ("scaler", TimeSeriesScaling())
             ])
             return pipeline
         except Exception as e:

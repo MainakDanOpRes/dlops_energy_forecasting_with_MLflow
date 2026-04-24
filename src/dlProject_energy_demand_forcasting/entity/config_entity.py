@@ -24,3 +24,12 @@ class DataTransformationConfig:
     preprocessor_obj_file_path: Path
     date_col: str = 'Date'
     time_col: str = 'Time'
+
+@dataclass(frozen=True)
+class ModelTrainerConfig:
+    root_dir: Path
+    train_data_path: Path
+    test_data_path: Path
+    all_model_params: dict  
+    window_size: int
+    target_column: str
