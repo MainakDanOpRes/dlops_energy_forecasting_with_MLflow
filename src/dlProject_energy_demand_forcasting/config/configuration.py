@@ -3,7 +3,8 @@ from src.dlProject_energy_demand_forcasting.utils.utils import read_yaml, create
 from src.dlProject_energy_demand_forcasting.entity.config_entity import (DataIngestionConfig, 
                                                                          DataValidationConfig, 
                                                                          DataTransformationConfig,
-                                                                         ModelTrainerConfig)
+                                                                         ModelTrainerConfig,
+                                                                         ModelEvaluationConfig)
 
 class ConfigurationManager:
     def __init__(self, config_filepath = CONFIG_FILE_PATH,
@@ -71,3 +72,23 @@ class ConfigurationManager:
             target_column=self.schema.target_column.name
         )
         return model_trainer_config
+    
+    def get_model_evaluation_config(self) -> ModelEvaluationConfig:
+        config = self.config.model_evaluation
+        all_params = {
+            "LSTM": self.params.LSTM,
+            "GRU": self.params.GRU
+        }
+        create_directories([config.root_dir])
+
+        return ModelEvaluationConfig(
+            root_dir=Path(config.root_dir),
+            model_path=Path(config.model_path),
+            test_data_path=Path(config.test_data_path),
+            metric_file_name=Path(config.metric_file_name),
+            preprocessor_path=Path(config.preprocessor_path),
+            mlflow_uri=config.mlflow_uri,
+            all_params=all_params,
+            window_size=self.params.data_transformation.window_size,
+            target_column=self.schema.target_column.name
+        )
