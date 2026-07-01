@@ -33,3 +33,18 @@ class ModelTrainerConfig:
     all_model_params: dict  
     window_size: int
     target_column: str
+
+@dataclass(frozen=True)
+class ModelEvaluationConfig:
+    root_dir: Path
+    test_data_path: Path
+    model_path: Path
+    preprocessor_path: Path   
+    target_column: str
+    window_size: int
+    metric_file_name: Path
+    mlflow_uri: str
+    all_params: dict
+    mlflow_uri: str
+
+    

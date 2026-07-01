@@ -1,0 +1,20 @@
+artifact_path: file:C:/Users/danm/Documents/DLOps_Project/mlruns/0/models/m-7e1ff0e2fec443e3a2afc8778a228af4/artifacts
+flavors:
+  keras:
+    data: data
+    keras_backend: tensorflow
+    keras_version: 3.14.0
+    save_exported_model: false
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.keras
+    python_version: 3.13.12
+mlflow_version: 3.11.1
+model_id: m-7e1ff0e2fec443e3a2afc8778a228af4
+model_size_bytes: 148668
+model_uuid: m-7e1ff0e2fec443e3a2afc8778a228af4
+prompts: null
+run_id: 2625731d74444f4aac202d102ebca23e
+utc_time_created: '2026-07-01 10:13:56.056891'
