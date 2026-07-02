@@ -11,9 +11,15 @@ GET  /model-info    → best model name + r2 from training
 POST /predict       → predict from last window of scaled values
 POST /forecast      → autoregressive n-step future forecast
 POST /predict-raw   → predict from raw (unscaled) CSV rows
+POST /train         → kick off a retraining run (main.py) in the background
+GET  /train/status  → is training running, last exit code
+GET  /train/logs    → tail of the training subprocess output
 """
 
+import os
+import subprocess
 import sys
+import threading
 import traceback
 from typing import List
 
@@ -21,6 +27,7 @@ import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.dlProject_energy_demand_forcasting.utils.logger import logging
@@ -45,6 +52,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Serves static/index.html at /dashboard/ (and any other files placed in static/)
+app.mount("/dashboard", StaticFiles(directory="static", html=True), name="dashboard")
+
 # ── Load pipeline once at startup ──────────────────────────────────────────────
 pipeline: PredictionPipeline | None = None
 
@@ -53,6 +63,66 @@ def load_pipeline():
     global pipeline
     logging.info("Initialising PredictionPipeline at startup.")
     pipeline = PredictionPipeline()
+
+
+# ── Background training state ───────────────────────────────────────────────────
+# Training runs main.py as a subprocess in a background thread so it doesn't block
+# the event loop. Only one run is allowed at a time. Logs are kept in memory (last
+# 500 lines) so the frontend can poll them while training is in progress.
+_training_lock = threading.Lock()
+_training_state = {
+    "running": False,
+    "returncode": None,
+    "logs": [],
+}
+
+
+def _run_training():
+    global pipeline
+    my_env = os.environ.copy()
+    my_env["PYTHONIOENCODING"] = "utf-8"
+
+    with _training_lock:
+        _training_state["running"] = True
+        _training_state["returncode"] = None
+        _training_state["logs"] = []
+
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, "main.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            encoding="utf-8",
+            errors="replace",
+            env=my_env,
+            bufsize=1,
+        )
+        for line in proc.stdout:
+            with _training_lock:
+                _training_state["logs"].append(line.rstrip("\n"))
+                _training_state["logs"] = _training_state["logs"][-500:]
+        proc.wait()
+        returncode = proc.returncode
+    except Exception:
+        returncode = -1
+        with _training_lock:
+            _training_state["logs"].append(traceback.format_exc())
+
+    with _training_lock:
+        _training_state["running"] = False
+        _training_state["returncode"] = returncode
+
+    # Reload the model into memory so /predict and /forecast pick up the new
+    # weights without needing a container restart.
+    if returncode == 0:
+        try:
+            pipeline = PredictionPipeline()
+            with _training_lock:
+                _training_state["logs"].append("[api] Pipeline reloaded with newly trained model.")
+        except Exception:
+            with _training_lock:
+                _training_state["logs"].append("[api] Training succeeded but reloading the pipeline failed:")
+                _training_state["logs"].append(traceback.format_exc())
 
 
 # ── Pydantic schemas ───────────────────────────────────────────────────────────
@@ -160,3 +230,33 @@ def predict_raw(request: RawPredictRequest):
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=traceback.format_exc())
+
+
+@app.post("/train", tags=["Train"])
+def start_training():
+    """
+    Kick off `main.py` (the training pipeline) as a background subprocess.
+    Returns immediately; poll /train/status and /train/logs for progress.
+    """
+    with _training_lock:
+        if _training_state["running"]:
+            raise HTTPException(status_code=409, detail="Training is already in progress.")
+
+    thread = threading.Thread(target=_run_training, daemon=True)
+    thread.start()
+    return {"status": "started"}
+
+
+@app.get("/train/status", tags=["Train"])
+def train_status():
+    with _training_lock:
+        return {
+            "running": _training_state["running"],
+            "returncode": _training_state["returncode"],
+        }
+
+
+@app.get("/train/logs", tags=["Train"])
+def train_logs():
+    with _training_lock:
+        return {"logs": _training_state["logs"]}

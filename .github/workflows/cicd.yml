@@ -1,0 +1,134 @@
+name: CI/CD - Build, Push to ECR, Deploy to EC2
+
+on:
+  push:
+    branches: [ "main" ]     # lint/test on every push to main
+    tags: [ "v*.*.*" ]       # full pipeline (build, push, deploy) only on version tags
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME }}
+
+jobs:
+  # ---------------------------------------------------------
+  # 1) Continuous Integration – lint + tests, runs on every push
+  #    (both branch pushes and tag pushes)
+  # ---------------------------------------------------------
+  integration:
+    name: Continuous Integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Run tests
+        run: |
+          if [ -f test.py ] || compgen -G "tests/*" > /dev/null 2>&1; then
+            uv run pytest -q
+          else
+            echo "No tests found, skipping."
+          fi
+
+  # ---------------------------------------------------------
+  # 2) Continuous Delivery – build image & push to Amazon ECR
+  # ---------------------------------------------------------
+  build-and-push:
+    name: Build & Push to ECR
+    needs: integration
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.vars.outputs.image_tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        id: vars
+        # github.ref_name is the tag itself when triggered by a tag push, e.g. "v1.2.3"
+        run: echo "image_tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Build, tag, and push image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.vars.outputs.image_tag }}
+        run: |
+          docker build \
+            -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
+            -t "$ECR_REGISTRY/$ECR_REPOSITORY:latest" .
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+
+  # ---------------------------------------------------------
+  # 3) Continuous Deployment – runs ON the EC2 box itself via a
+  #    self-hosted GitHub Actions runner registered on that instance.
+  # ---------------------------------------------------------
+  deploy:
+    name: Deploy to EC2
+    needs: build-and-push
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: self-hosted
+    env:
+      IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+    steps:
+      - name: Checkout docker-compose.yml
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            docker-compose.yml
+          sparse-checkout-cone-mode: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Pull released image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: docker pull "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Deploy with Docker Compose
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+        run: |
+          export IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker compose -f docker-compose.yml up -d --force-recreate --remove-orphans
+
+      - name: Prune old images
+        run: docker image prune -af
