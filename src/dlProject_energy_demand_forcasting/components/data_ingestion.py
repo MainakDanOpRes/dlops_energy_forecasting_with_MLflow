@@ -30,8 +30,17 @@ class DataIngestion:
             )
     
     def extract_zip_file(self):
-        
         unzip_path = self.config.unzip_dir
         os.makedirs(unzip_path, exist_ok=True)
+
+        expected_file = os.path.join(unzip_path, "household_power_consumption.txt")
+        if os.path.exists(expected_file):
+            logging.info(
+                f"Raw data file already present at {expected_file} — skipping extraction. "
+                f"Delete this file (and/or {self.config.local_data_file}) if you want to "
+                f"force a fresh download+extract from the source URL."
+            )
+            return
+
         with zipfile.ZipFile(self.config.local_data_file, 'r') as zip_ref:
             zip_ref.extractall(unzip_path)

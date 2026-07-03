@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Energy Demand Forecasting</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171d2d;
+    --panel-border: #2a3348;
+    --text: #e8ecf4;
+    --muted: #8b93a7;
+    --accent: #ff7f0e;
+    --accent-2: #1f77b4;
+    --ok: #3ddc84;
+    --err: #ff5c5c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--panel-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+  header h1 span { color: var(--accent); }
+  #model-badge {
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  #model-badge b { color: var(--text); }
+  main { max-width: 1000px; margin: 0 auto; padding: 24px 32px 64px; }
+  nav { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+  nav button {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    color: var(--muted);
+    padding: 10px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  nav button.active { color: var(--text); border-color: var(--accent); }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 24px;
+    display: none;
+  }
+  .panel.active { display: block; }
+  .panel h2 { margin-top: 0; font-size: 16px; }
+  .panel p.hint { color: var(--muted); font-size: 13px; margin-top: -8px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 16px 0 6px; }
+  textarea, input[type="number"], input[type="file"] {
+    width: 100%;
+    background: #0f1420;
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: monospace;
+    font-size: 13px;
+  }
+  input[type="file"] { font-family: inherit; padding: 10px; }
+  textarea { min-height: 90px; resize: vertical; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 160px; }
+  button.run {
+    margin-top: 20px;
+    background: var(--accent);
+    color: #1a1200;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  button.run:disabled { opacity: 0.5; cursor: default; }
+  button.run.danger { background: var(--err); color: #1a0000; }
+  .status { margin-top: 12px; font-size: 13px; }
+  .status.err { color: var(--err); }
+  .status.ok { color: var(--ok); }
+  .stats { display: flex; gap: 24px; margin-top: 20px; flex-wrap: wrap; }
+  .stats div { background: #0f1420; border: 1px solid var(--panel-border); border-radius: 8px; padding: 12px 18px; }
+  .stats div .label { font-size: 12px; color: var(--muted); }
+  .stats div .value { font-size: 18px; font-weight: 600; margin-top: 4px; }
+  canvas { margin-top: 20px; max-height: 380px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12px; }
+  table th, table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--panel-border); white-space: nowrap; }
+  table th { color: var(--muted); font-weight: 500; }
+  .table-wrap { overflow-x: auto; max-height: 220px; overflow-y: auto; border: 1px solid var(--panel-border); border-radius: 8px; }
+  pre#train-console {
+    margin-top: 16px;
+    background: #0a0e17;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 12px;
+    max-height: 360px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .badge-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .badge-dot.idle { background: var(--muted); }
+  .badge-dot.running { background: var(--accent); animation: pulse 1.2s infinite; }
+  .badge-dot.ok { background: var(--ok); }
+  .badge-dot.err { background: var(--err); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ Energy Demand <span>Forecasting</span></h1>
+  <div id="model-badge">Loading model info…</div>
+</header>
+
+<main>
+  <nav>
+    <button class="tab-btn active" data-tab="forecast">Forecast</button>
+    <button class="tab-btn" data-tab="predict">Predict</button>
+    <button class="tab-btn" data-tab="upload">Upload CSV</button>
+    <button class="tab-btn" data-tab="train">Train</button>
+  </nav>
+
+  <!-- FORECAST TAB -->
+  <section class="panel active" id="tab-forecast">
+    <h2>Autoregressive Future Forecast</h2>
+    <p class="hint">Paste the last <span id="window-size-1">…</span> scaled values (comma-separated), then roll the model forward.</p>
+
+    <label for="forecast-window">Last window (scaled values)</label>
+    <textarea id="forecast-window" placeholder="0.30, 0.31, 0.29, ..."></textarea>
+
+    <div class="row">
+      <div>
+        <label for="forecast-steps">Hours to forecast</label>
+        <input type="number" id="forecast-steps" value="24" min="1" max="168" />
+      </div>
+    </div>
+
+    <button class="run" id="forecast-btn">🔮 Forecast</button>
+    <div class="status" id="forecast-status"></div>
+
+    <div class="stats" id="forecast-stats" style="display:none;">
+      <div><div class="label">Peak (kW)</div><div class="value" id="stat-peak">–</div></div>
+      <div><div class="label">Min (kW)</div><div class="value" id="stat-min">–</div></div>
+      <div><div class="label">Avg (kW)</div><div class="value" id="stat-avg">–</div></div>
+    </div>
+
+    <canvas id="forecast-chart"></canvas>
+  </section>
+
+  <!-- PREDICT TAB -->
+  <section class="panel" id="tab-predict">
+    <h2>Predict from Scaled Values</h2>
+    <p class="hint">Provide at least <span id="window-size-2">…</span> scaled values from <code>test_transformed.csv</code>; get real-unit (kW) predictions for every window.</p>
+
+    <label for="predict-values">Scaled values</label>
+    <textarea id="predict-values" placeholder="0.30, 0.31, 0.29, ..."></textarea>
+
+    <button class="run" id="predict-btn">📊 Predict</button>
+    <div class="status" id="predict-status"></div>
+
+    <canvas id="predict-chart"></canvas>
+  </section>
+
+  <!-- UPLOAD CSV TAB -->
+  <section class="panel" id="tab-upload">
+    <h2>Upload CSV & Predict</h2>
+    <p class="hint">
+      Upload a raw CSV with columns: <code>Date, Time, Global_active_power, Global_reactive_power,
+      Voltage, Global_intensity, Sub_metering_1, Sub_metering_2, Sub_metering_3</code>.
+      Needs at least <span id="window-size-3">…</span> rows. The full preprocessing pipeline runs server-side.
+    </p>
+
+    <label for="csv-file">CSV file</label>
+    <input type="file" id="csv-file" accept=".csv" />
+
+    <div id="csv-preview-wrap" style="display:none;">
+      <p class="hint" id="csv-preview-summary"></p>
+      <div class="table-wrap"><table id="csv-preview-table"></table></div>
+    </div>
+
+    <button class="run" id="upload-btn" disabled>📤 Upload & Predict</button>
+    <div class="status" id="upload-status"></div>
+
+    <canvas id="upload-chart"></canvas>
+  </section>
+
+  <!-- TRAIN TAB -->
+  <section class="panel" id="tab-train">
+    <h2>Retrain the Model</h2>
+    <p class="hint">
+      Runs <code>main.py</code> (the full training pipeline) on the server. This can take a while
+      and will use significant CPU/RAM — avoid triggering it more than once at a time.
+    </p>
+
+    <div class="status" id="train-badge">
+      <span class="badge-dot idle"></span>Idle
+    </div>
+
+    <button class="run" id="train-btn">🚀 Start Training</button>
+
+    <pre id="train-console">Logs will appear here once training starts…</pre>
+  </section>
+</main>
+
+<script>
+const API_BASE = "";        // same-origin: dashboard is served by FastAPI itself
+let WINDOW_SIZE = null;
+let forecastChart, predictChart, uploadChart;
+let parsedCsvRows = null;
+let trainPollTimer = null;
+
+// ---- tabs ----
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+  });
+});
+
+// ---- model info ----
+async function loadModelInfo() {
+  const badge = document.getElementById("model-badge");
+  try {
+    const res = await fetch(`${API_BASE}/model-info`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const info = await res.json();
+    WINDOW_SIZE = info.window_size;
+    badge.innerHTML = `
+      <span><b>${info.model_name}</b></span>
+      <span>R² <b>${(info.r2_score ?? 0).toFixed(4)}</b></span>
+      <span>Window <b>${info.window_size}h</b></span>
+      <span>Target <b>${info.target}</b></span>
+    `;
+    document.getElementById("window-size-1").textContent = info.window_size;
+    document.getElementById("window-size-2").textContent = info.window_size + 1;
+    document.getElementById("window-size-3").textContent = info.window_size + 1;
+    document.getElementById("forecast-window").placeholder =
+      Array(info.window_size).fill("0.30").join(", ");
+  } catch (err) {
+    badge.textContent = "Model info unavailable — is the API running?";
+    badge.style.color = "var(--err)";
+  }
+}
+loadModelInfo();
+
+function parseFloatList(text) {
+  return text.split(",").map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
+}
+
+function setStatus(elId, msg, kind) {
+  const el = document.getElementById(elId);
+  el.textContent = msg;
+  el.className = "status " + (kind || "");
+}
+
+function lineChart(canvasId, existing, labels, data, label, color) {
+  if (existing) existing.destroy();
+  return new Chart(document.getElementById(canvasId), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label, data, borderColor: color,
+        backgroundColor: color + "26",
+        tension: 0.25, pointRadius: 2,
+      }],
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { ticks: { color: "#8b93a7" }, grid: { color: "#2a3348" } },
+        y: { title: { display: true, text: "kW" }, ticks: { color: "#8b93a7" }, grid: { color: "#2a3348" } },
+      },
+      plugins: { legend: { labels: { color: "#e8ecf4" } } },
+    },
+  });
+}
+
+// ---- forecast ----
+document.getElementById("forecast-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("forecast-btn");
+  const lastWindow = parseFloatList(document.getElementById("forecast-window").value);
+  const nSteps = parseInt(document.getElementById("forecast-steps").value, 10) || 24;
+
+  if (WINDOW_SIZE && lastWindow.length !== WINDOW_SIZE) {
+    setStatus("forecast-status", `Need exactly ${WINDOW_SIZE} values, got ${lastWindow.length}.`, "err");
+    return;
+  }
+
+  btn.disabled = true;
+  setStatus("forecast-status", "Running forecast…", "");
+
+  try {
+    const res = await fetch(`${API_BASE}/forecast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ last_window: lastWindow, n_steps: nSteps }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+
+    const preds = data.predictions;
+    const hours = preds.map((_, i) => i + 1);
+
+    document.getElementById("forecast-stats").style.display = "flex";
+    document.getElementById("stat-peak").textContent = Math.max(...preds).toFixed(3);
+    document.getElementById("stat-min").textContent = Math.min(...preds).toFixed(3);
+    document.getElementById("stat-avg").textContent = (preds.reduce((a,b)=>a+b,0) / preds.length).toFixed(3);
+
+    forecastChart = lineChart("forecast-chart", forecastChart, hours, preds, "Forecast (kW)", "#ff7f0e");
+    setStatus("forecast-status", "Done.", "ok");
+  } catch (err) {
+    setStatus("forecast-status", "Error: " + err.message, "err");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---- predict ----
+document.getElementById("predict-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("predict-btn");
+  const values = parseFloatList(document.getElementById("predict-values").value);
+
+  if (WINDOW_SIZE && values.length < WINDOW_SIZE + 1) {
+    setStatus("predict-status", `Need at least ${WINDOW_SIZE + 1} values, got ${values.length}.`, "err");
+    return;
+  }
+
+  btn.disabled = true;
+  setStatus("predict-status", "Running prediction…", "");
+
+  try {
+    const res = await fetch(`${API_BASE}/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scaled_values: values }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+
+    const preds = data.predictions;
+    const idx = preds.map((_, i) => i + 1);
+    predictChart = lineChart("predict-chart", predictChart, idx, preds, "Predicted (kW)", "#1f77b4");
+    setStatus("predict-status", "Done.", "ok");
+  } catch (err) {
+    setStatus("predict-status", "Error: " + err.message, "err");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---- upload CSV ----
+const REQUIRED_COLUMNS = [
+  "Date", "Time", "Global_active_power", "Global_reactive_power",
+  "Voltage", "Global_intensity", "Sub_metering_1", "Sub_metering_2", "Sub_metering_3",
+];
+
+document.getElementById("csv-file").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  const uploadBtn = document.getElementById("upload-btn");
+  parsedCsvRows = null;
+  uploadBtn.disabled = true;
+  document.getElementById("csv-preview-wrap").style.display = "none";
+  setStatus("upload-status", "", "");
+
+  if (!file) return;
+
+  Papa.parse(file, {
+    header: true,
+    dynamicTyping: true,
+    skipEmptyLines: true,
+    complete: (results) => {
+      const missing = REQUIRED_COLUMNS.filter(c => !results.meta.fields.includes(c));
+      if (missing.length) {
+        setStatus("upload-status", `CSV is missing columns: ${missing.join(", ")}`, "err");
+        return;
+      }
+
+      parsedCsvRows = results.data.map(row => {
+        const clean = {};
+        REQUIRED_COLUMNS.forEach(c => { clean[c] = row[c]; });
+        return clean;
+      });
+
+      const minRows = (WINDOW_SIZE ?? 24) + 1;
+      if (parsedCsvRows.length < minRows) {
+        setStatus("upload-status", `Need at least ${minRows} rows, got ${parsedCsvRows.length}.`, "err");
+        return;
+      }
+
+      // preview: first 5 rows
+      const preview = parsedCsvRows.slice(0, 5);
+      const table = document.getElementById("csv-preview-table");
+      table.innerHTML =
+        "<tr>" + REQUIRED_COLUMNS.map(c => `<th>${c}</th>`).join("") + "</tr>" +
+        preview.map(r => "<tr>" + REQUIRED_COLUMNS.map(c => `<td>${r[c]}</td>`).join("") + "</tr>").join("");
+      document.getElementById("csv-preview-summary").textContent =
+        `${parsedCsvRows.length} rows parsed. Showing first ${preview.length}.`;
+      document.getElementById("csv-preview-wrap").style.display = "block";
+
+      uploadBtn.disabled = false;
+      setStatus("upload-status", "Ready to predict.", "ok");
+    },
+    error: (err) => setStatus("upload-status", "CSV parse error: " + err.message, "err"),
+  });
+});
+
+document.getElementById("upload-btn").addEventListener("click", async () => {
+  if (!parsedCsvRows) return;
+  const btn = document.getElementById("upload-btn");
+  btn.disabled = true;
+  setStatus("upload-status", "Uploading & predicting…", "");
+
+  try {
+    const res = await fetch(`${API_BASE}/predict-raw`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rows: parsedCsvRows }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+
+    const preds = data.predictions;
+    const idx = preds.map((_, i) => i + 1);
+    uploadChart = lineChart("upload-chart", uploadChart, idx, preds, "Predicted (kW)", "#3ddc84");
+    setStatus("upload-status", `Done — ${preds.length} predictions.`, "ok");
+  } catch (err) {
+    setStatus("upload-status", "Error: " + err.message, "err");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---- train ----
+function setTrainBadge(kind, text) {
+  document.getElementById("train-badge").innerHTML =
+    `<span class="badge-dot ${kind}"></span>${text}`;
+}
+
+function renderTrainLogs(lines) {
+  const el = document.getElementById("train-console");
+  el.textContent = lines.length ? lines.join("\n") : "No output yet…";
+  el.scrollTop = el.scrollHeight;
+}
+
+async function pollTraining() {
+  try {
+    const [statusRes, logsRes] = await Promise.all([
+      fetch(`${API_BASE}/train/status`),
+      fetch(`${API_BASE}/train/logs`),
+    ]);
+    const status = await statusRes.json();
+    const logs = await logsRes.json();
+    renderTrainLogs(logs.logs || []);
+
+    if (status.running) {
+      setTrainBadge("running", "Training in progress…");
+    } else {
+      clearInterval(trainPollTimer);
+      trainPollTimer = null;
+      document.getElementById("train-btn").disabled = false;
+      if (status.returncode === 0) {
+        setTrainBadge("ok", "Training finished successfully. Model reloaded.");
+        loadModelInfo();
+      } else if (status.returncode === null) {
+        setTrainBadge("idle", "Idle");
+      } else {
+        setTrainBadge("err", `Training failed (exit code ${status.returncode}).`);
+      }
+    }
+  } catch (err) {
+    setTrainBadge("err", "Could not reach the API.");
+  }
+}
+
+document.getElementById("train-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("train-btn");
+  btn.disabled = true;
+  setTrainBadge("running", "Starting…");
+
+  try {
+    const res = await fetch(`${API_BASE}/train`, { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+
+    if (trainPollTimer) clearInterval(trainPollTimer);
+    trainPollTimer = setInterval(pollTraining, 1500);
+    pollTraining();
+  } catch (err) {
+    setTrainBadge("err", "Error: " + err.message);
+    btn.disabled = false;
+  }
+});
+
+// Pick up an already-running training job on page load (e.g. after a refresh)
+(async () => {
+  try {
+    const res = await fetch(`${API_BASE}/train/status`);
+    const status = await res.json();
+    if (status.running) {
+      document.getElementById("train-btn").disabled = true;
+      trainPollTimer = setInterval(pollTraining, 1500);
+      pollTraining();
+    }
+  } catch (_) { /* API not reachable yet; ignore */ }
+})();
+</script>
+</body>
+</html>

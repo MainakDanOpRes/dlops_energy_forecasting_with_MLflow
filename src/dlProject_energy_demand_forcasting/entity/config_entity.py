@@ -31,8 +31,11 @@ class ModelTrainerConfig:
     train_data_path: Path
     test_data_path: Path
     all_model_params: dict  
+    tuning_params: dict
     window_size: int
     target_column: str
+    tuner_dir: Path
+    mlflow_uri: str
 
 @dataclass(frozen=True)
 class ModelEvaluationConfig:
@@ -45,6 +48,5 @@ class ModelEvaluationConfig:
     metric_file_name: Path
     mlflow_uri: str
     all_params: dict
-    mlflow_uri: str
 
     

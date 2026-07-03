@@ -1,0 +1,34 @@
+services:
+  api:
+    image: ${IMAGE_URI}
+    container_name: energy-forecast-api
+    restart: unless-stopped
+    command: ["uvicorn", "fastapi_app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  dashboard:
+    image: ${IMAGE_URI}
+    container_name: energy-forecast-dashboard
+    restart: unless-stopped
+    command: [
+      "streamlit", "run", "streamlit_app.py",
+      "--server.address=0.0.0.0",
+      "--server.port=8501",
+      "--server.headless=true",
+      "--browser.gatherUsageStats=false"
+    ]
+    ports:
+      - "8501:8501"
+    environment:
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-}
+    depends_on:
+      - api

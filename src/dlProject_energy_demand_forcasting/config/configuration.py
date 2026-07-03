@@ -68,8 +68,11 @@ class ConfigurationManager:
             train_data_path=Path(config.train_data_path),
             test_data_path=Path(config.test_data_path),
             all_model_params=all_params,
+            tuning_params=self.params.tuning,
             window_size=self.params.data_transformation.window_size,
-            target_column=self.schema.target_column.name
+            target_column=self.schema.target_column.name,
+            tuner_dir=Path(config.tuner_dir),
+            mlflow_uri=config.mlflow_uri
         )
         return model_trainer_config
     

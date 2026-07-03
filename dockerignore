@@ -1,0 +1,31 @@
+.git
+.github
+.gitignore
+.venv
+venv
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+# Notebooks / research – not needed at runtime
+research/
+*.ipynb
+.ipynb_checkpoints
+
+# Experiment tracking / training artifacts – rebuilt or pulled at deploy time,
+# not baked into the image
+mlruns/
+artifacts/
+
+# Local env & secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Docs
+README.md
+DEPLOYMENT.md
