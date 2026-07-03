@@ -64,7 +64,21 @@ with tab1:
     col3.metric("Window Size", f"{WINDOW_SIZE} hours")
 
     st.markdown("---")
-    st.subheader("Training Parameters")
+    st.subheader("Winning Hyperparameters (Last Training Run)")
+
+    winning_hp = pipeline.best_info.get("hyperparameters", {})
+    if winning_hp:
+        st.caption(f"Selected by hyperparameter search for the **{pipeline.model_name}** model.")
+        st.json(winning_hp)
+    else:
+        st.info(
+            "No saved hyperparameters found in `best_model_info.pkl`. "
+            "Retrain the model to populate this (see the ⚙️ Retrain tab)."
+        )
+
+    st.markdown("---")
+    st.subheader("Hyperparameter Search Space (params.yaml)")
+    st.caption("Ranges the tuner searches over — not the final values used by the current model.")
 
     params_path = os.path.join("params.yaml")
     if os.path.exists(params_path):
@@ -308,10 +322,37 @@ with tab4:
             "Run the model evaluation pipeline first (`python main.py` or notebook 05)."
         )
 
-with tab5: # Assuming you added the 5th tab
+with tab5: 
     st.header("⚙️ Model Retraining Control")
     st.warning("Retraining is resource-intensive and will take time. The dashboard will be unresponsive while training is active.")
-    
+
+    st.markdown("---")
+    st.subheader("1. (Optional) Use a new raw dataset")
+    st.markdown(
+        "Upload a new raw file matching the original schema "
+        "(same columns as `household_power_consumption.txt`: `Date`, `Time`, "
+        "`Global_active_power`, `Global_reactive_power`, `Voltage`, `Global_intensity`, "
+        "`Sub_metering_1/2/3`). This **overwrites** the file the pipeline reads during "
+        "data ingestion, so the next run trains on your new data instead of the original download."
+    )
+    new_data_file = st.file_uploader("Upload new raw dataset (.txt)", type=["txt"])
+    ingestion_target_path = os.path.join("artifacts", "data_ingestion", "household_power_consumption.txt")
+
+    if new_data_file is not None:
+        if st.button("💾 Save as new raw dataset"):
+            os.makedirs(os.path.dirname(ingestion_target_path), exist_ok=True)
+            with open(ingestion_target_path, "wb") as f:
+                f.write(new_data_file.getbuffer())
+            st.success(f"Saved new dataset to `{ingestion_target_path}`.")
+            st.info(
+                "✅ The pipeline's data ingestion stage skips its download+extract step "
+                "whenever this file already exists, so your uploaded dataset will be used "
+                "as-is on the next training run — nothing will overwrite it."
+            )
+
+    st.markdown("---")
+    st.subheader("2. Run the training pipeline")
+
     if st.button("🚀 Start Training Pipeline"):
         with st.spinner("Training in progress... This may take several minutes."):
             log_placeholder = st.empty()
@@ -319,12 +360,12 @@ with tab5: # Assuming you added the 5th tab
             my_env = os.environ.copy()
             my_env["PYTHONIOENCODING"] = "utf-8"
             try:
-                
+
                 process = subprocess.Popen(
                     [sys.executable, "main.py"],
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,  
-                    encoding="utf-8",      
+                    stderr=subprocess.STDOUT,
+                    encoding="utf-8",
                     errors="replace",
                     env=my_env,
                     bufsize=1  # Line-buffered
@@ -332,14 +373,14 @@ with tab5: # Assuming you added the 5th tab
                 for line in process.stdout:
                     log_output.append(line)
                     log_placeholder.code("".join(log_output[-30:]))
-                
+
                 process.wait()
                 if process.returncode == 0:
                     st.success("Training completed successfully!")
-                    st.rerun() 
+                    st.rerun()
                 else:
                     st.error(f"Training failed with exit code {process.returncode}.")
                     st.text("Check the logs above for details.")
-                
+
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")

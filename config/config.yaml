@@ -25,6 +25,8 @@ model_trainer:
   root_dir: artifacts/model_trainer
   train_data_path: artifacts/data_transformation/train_transformed.csv
   test_data_path: artifacts/data_transformation/test_transformed.csv
+  tuner_dir: artifacts/model_trainer/keras_tuner
+  mlflow_uri: "https://dagshub.com/MainakDanOpRes/dlops_energy_forecasting_with_MLflow.mlflow"
 
 model_evaluation:
   root_dir: artifacts/model_evaluation
