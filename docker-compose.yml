@@ -33,6 +33,3 @@ services:
     ]
     ports:
       - "8501:8501"
-    depends_on:
-      api:
-        condition: service_healthy
