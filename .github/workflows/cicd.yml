@@ -41,13 +41,13 @@ jobs:
       - name: Run tests
         run: |
           if [ -f test.py ] || compgen -G "tests/*" > /dev/null 2>&1; then
-            uv run pytest -q
-            code=$?
-            if [ $code -eq 5 ]; then
+            uv run pytest -q || code=$?
+            code=${code:-0}
+            if [ "$code" -eq 5 ]; then
               echo "No tests collected — skipping."
               exit 0
             fi
-            exit $code
+            exit "$code"
           else
             echo "No tests found, skipping."
           fi
