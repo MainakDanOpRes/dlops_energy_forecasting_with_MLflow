@@ -1,13 +1,17 @@
+x-common-config: &common-config
+  restart: unless-stopped
+  environment:
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-}
+
 services:
   api:
+    <<: *common-config
     image: ${IMAGE_URI}
     container_name: energy-forecast-api
     restart: unless-stopped
     command: ["uvicorn", "fastapi_app:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8000:8000"
-    environment:
-      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s
@@ -16,6 +20,7 @@ services:
       start_period: 30s
 
   dashboard:
+    <<: *common-config
     image: ${IMAGE_URI}
     container_name: energy-forecast-dashboard
     restart: unless-stopped
@@ -28,7 +33,6 @@ services:
     ]
     ports:
       - "8501:8501"
-    environment:
-      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-}
     depends_on:
-      - api
+      api:
+        condition: service_healthy
