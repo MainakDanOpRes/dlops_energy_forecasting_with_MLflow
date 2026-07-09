@@ -2,7 +2,6 @@ x-common-config: &common-config
   restart: unless-stopped
   environment:
       - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-}
-  
 
 
 services:
