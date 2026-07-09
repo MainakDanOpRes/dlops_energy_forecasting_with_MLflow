@@ -193,7 +193,7 @@ def predict_scaled(request: ScaledWindowRequest):
         return result
     except CustomException as e:
         raise HTTPException(status_code=500, detail=str(e))
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail=traceback.format_exc())
 
 
@@ -211,7 +211,7 @@ def forecast(request: ForecastRequest):
         return result
     except CustomException as e:
         raise HTTPException(status_code=500, detail=str(e))
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail=traceback.format_exc())
 
 
@@ -228,7 +228,7 @@ def predict_raw(request: RawPredictRequest):
         return result
     except CustomException as e:
         raise HTTPException(status_code=500, detail=str(e))
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail=traceback.format_exc())
 
 

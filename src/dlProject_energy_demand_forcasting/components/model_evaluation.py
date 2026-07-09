@@ -11,7 +11,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 from src.dlProject_energy_demand_forcasting.utils.exception import CustomException
 from src.dlProject_energy_demand_forcasting.utils.logger import logging
-from src.dlProject_energy_demand_forcasting.utils.utils import load_object, save_json
+from src.dlProject_energy_demand_forcasting.utils.utils import load_object
 from src.dlProject_energy_demand_forcasting.entity.config_entity import ModelEvaluationConfig
 
 # ── Centralized MLflow tracking config ──────────────────────────────────

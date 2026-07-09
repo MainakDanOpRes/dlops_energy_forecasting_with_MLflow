@@ -1,4 +1,3 @@
-import os 
 import sys 
 from src.dlProject_energy_demand_forcasting.config.configuration import ConfigurationManager
 from src.dlProject_energy_demand_forcasting.components.data_ingestion import DataIngestion

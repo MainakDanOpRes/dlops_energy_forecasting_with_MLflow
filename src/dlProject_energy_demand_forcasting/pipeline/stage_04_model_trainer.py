@@ -1,9 +1,6 @@
-import os 
-from pathlib import Path
 import sys 
 from src.dlProject_energy_demand_forcasting.config.configuration import ConfigurationManager
 from src.dlProject_energy_demand_forcasting.components.model_trainer import ModelTrainer
-from src.dlProject_energy_demand_forcasting.utils.logger import logging
 from src.dlProject_energy_demand_forcasting.utils.exception import CustomException
 
 

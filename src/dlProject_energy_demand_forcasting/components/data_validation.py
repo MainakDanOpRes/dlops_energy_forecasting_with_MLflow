@@ -2,10 +2,8 @@ import pandas as pd
 import os
 import sys
 from src.dlProject_energy_demand_forcasting.utils.logger import logging
-from src.dlProject_energy_demand_forcasting.utils.utils import get_size
 from src.dlProject_energy_demand_forcasting.utils.exception import CustomException
 from src.dlProject_energy_demand_forcasting.entity.config_entity import DataValidationConfig
-from pathlib import Path
 
 class DataValidation:
     def __init__(self, config: DataValidationConfig):

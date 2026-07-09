@@ -8,7 +8,7 @@ import mlflow
 import mlflow.tensorflow
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, GRU, Dense, Dropout, Input
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.metrics import r2_score
 
 from src.dlProject_energy_demand_forcasting.utils.exception import CustomException
 from src.dlProject_energy_demand_forcasting.utils.logger import logging

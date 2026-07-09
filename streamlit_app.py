@@ -20,7 +20,9 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
-import plotly.express as px
+from src.dlProject_energy_demand_forcasting.pipeline.prediction_pipeline import (
+    PredictionPipeline, WINDOW_SIZE, TARGET_COLUMN,
+)
 
 # ── must be first streamlit call ───────────────────────────────────────────────
 st.set_page_config(
@@ -32,12 +34,10 @@ st.set_page_config(
 # ── load pipeline (cached so it only loads once per session) ───────────────────
 @st.cache_resource(show_spinner="Loading model...")
 def load_pipeline():
-    from src.dlProject_energy_demand_forcasting.pipeline.prediction_pipeline import PredictionPipeline
     return PredictionPipeline()
 
 pipeline = load_pipeline()
 
-from src.dlProject_energy_demand_forcasting.pipeline.prediction_pipeline import WINDOW_SIZE, TARGET_COLUMN
 
 # ── sidebar ────────────────────────────────────────────────────────────────────
 st.sidebar.image("https://img.icons8.com/fluency/96/lightning-bolt.png", width=64)
