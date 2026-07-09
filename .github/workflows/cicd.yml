@@ -77,6 +77,11 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" \
+            || aws ecr create-repository --repository-name "$ECR_REPOSITORY"
+
       - name: Set image tag
         id: vars
         # github.ref_name is the tag itself when triggered by a tag push, e.g. "v1.2.3"
