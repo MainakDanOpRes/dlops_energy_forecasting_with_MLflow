@@ -3,7 +3,6 @@ x-common-config: &common-config
   environment:
       - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-}
 
-
 services:
   api:
     <<: *common-config
